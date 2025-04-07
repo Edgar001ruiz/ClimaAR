@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import WeatherDisplay from './src/components/WeatherDisplay';
+import { View, Text, StyleSheet, ActivityIndicator, Button } from 'react-native';
+import WeatherDisplay from './src/screens/WeatherDisplay';
 import { fetchWeatherData } from './src/services/WeatherService';
 import * as Location from 'expo-location';
 
@@ -10,10 +10,22 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState(null);
 
+  const updateWeather = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchWeatherData();
+      setWeather(data);
+      setLocation(data.coord); // Para mostrar ubicación de forma más precisa
+    } catch (error) {
+      setLocationError('Error al obtener clima');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
-        // Solicitar permisos
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setLocationError('Permiso de ubicación denegado');
@@ -21,41 +33,43 @@ export default function App() {
           return;
         }
 
-        // Obtener ubicación
-        let locationData = await Location.getCurrentPositionAsync({});
-        setLocation(locationData.coords);
-
-        // Obtener clima
-        const data = await fetchWeatherData();
-        setWeather(data);
+        await updateWeather(); // Primera carga
       } catch (error) {
         setLocationError('Error al obtener ubicación');
-      } finally {
-        setLoading(false);
       }
     };
 
     load();
-  }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#333" />
-        <Text>Cargando...</Text>
-      </View>
-    );
-  }
+    // Actualizar cada 5 segundos
+    const interval = setInterval(() => {
+      updateWeather();
+    }, 5000);
+
+    return () => clearInterval(interval); // Limpiar intervalo al desmontar
+  }, []);
 
   return (
     <View style={styles.container}>
-      {weather && <WeatherDisplay weather={weather} />}
+      {loading && (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#333" />
+          <Text>Cargando...</Text>
+        </View>
+      )}
+
+      {!loading && weather && <WeatherDisplay weather={weather} />}
+
       {location && (
         <Text style={styles.locationText}>
-          Ubicación: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+          Ubicación: {location.lat?.toFixed(4)}, {location.lon?.toFixed(4)}
         </Text>
       )}
       {locationError && <Text style={styles.error}>{locationError}</Text>}
+
+      <View style={styles.buttonContainer}>
+        <Button title="Actualizar Datos" onPress={updateWeather} />
+      </View>
     </View>
   );
 }
@@ -68,6 +82,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  loading: {
+    alignItems: 'center',
+  },
   locationText: {
     fontSize: 16,
     marginTop: 20,
@@ -76,5 +93,8 @@ const styles = StyleSheet.create({
   error: {
     color: 'red',
     marginTop: 20,
+  },
+  buttonContainer: {
+    marginTop: 30,
   },
 });

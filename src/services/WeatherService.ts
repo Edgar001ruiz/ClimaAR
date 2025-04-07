@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 
 export async function fetchWeatherData() {
+  
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
     throw new Error('Permiso de ubicación no concedido');
